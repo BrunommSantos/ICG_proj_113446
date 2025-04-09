@@ -108,10 +108,13 @@
     const loader3 = new GLTFLoader();
     let boss, bossMixer;
     let cutscene;
+    let startfight=false;
+    let canMove = true;
+    let cuttrig = false;
     let tickFunctions = []
     const clock = new THREE.Clock();    
     let bossAnimations = {};
-    loader3.load('introvoo.glb', function (gltf) {
+    loader3.load('introevoo2.glb', function (gltf) {
         boss = gltf.scene;
         boss.position.set(-20, 6, -10);
         boss.scale.set(2, 2, 2);
@@ -353,6 +356,13 @@ function moveLight() {
     const keys = {};
     window.addEventListener('keydown', (event) => { keys[event.code] = true; });
     window.addEventListener('keyup', (event) => { keys[event.code] = false; });
+    // listener para o clique do rato (ataque)
+    document.addEventListener("mousedown", (event) => {
+    if (event.button === 0) { 
+        console.log("fire")
+        playerAttack();
+    }
+});
 
     //Adaptação a resize da janela
     window.addEventListener('resize', () => {
@@ -369,6 +379,7 @@ function moveLight() {
     const cameraDistance = 15;
     const cameraHeight = 5;
     const cameraSmoothness = 1;
+    
 
     // parametros para a logica de salto
     const jumpHeight = 25;
@@ -441,9 +452,15 @@ function moveLight() {
     const delta = clock.getDelta(); 
     
     tickFunctions.forEach(fn => fn(delta));
-
-    if (player.position.x<-10){
+    console.log(startfight);
+    if (player.position.x<-14 && !cuttrig){
         cutscene=true;
+        cuttrig=true;
+        canMove = false;
+        setTimeout(() => {
+            startfight = true
+            canMove = true;
+            }, 2000);
     }
     // remover as chamas do array e as luzes
     flames.forEach((flameObject, index) => {
@@ -451,6 +468,11 @@ function moveLight() {
             scene.remove(flameObject.flame);  
             scene.remove(flameObject.flameLight);  
             flames.splice(index, 1);  
+            
+
+            setTimeout(() => {
+            
+            }, 2000);
         }
     });
 
@@ -462,7 +484,7 @@ function moveLight() {
     let deltaTime = (now - lastTime) / 1000;
     lastTime = now;
     // todos os movimentos sao regulados pelo delta time para consistencia com as animacoes independetemente de fps
-    if (!isDashing) {
+    if (!isDashing & canMove) {
         
         if (keys["KeyD"] && player.position.x > boundaryn) {
             player.position.x -= 20 * deltaTime;
@@ -483,7 +505,7 @@ function moveLight() {
             let dashStartTime = Date.now();
             function dashMove() {
                 let elapsed = Date.now() - dashStartTime;
-                if (elapsed < dashDuration) {
+                if (elapsed < dashDuration && player.position.x>-38) {
                     player.position.x += lastDirection * 100 * deltaTime; // movimento ajustado com delta time
                     requestAnimationFrame(dashMove);
                 } else {
@@ -500,13 +522,7 @@ function moveLight() {
         isJumping = true;
         peakReached = false;
     }
-    // listener para o clique do rato (ataque)
-    document.addEventListener("mousedown", (event) => {
-    if (event.button === 0) { 
-        console.log("fire")
-        playerAttack();
-    }
-});
+    
 
     // Aplicar gravidade aos saltos
     if (isJumping) {
@@ -532,11 +548,10 @@ function moveLight() {
 
     
     const time = Date.now() * 0.001;
-    
     count = count+1;
     
     // geração de ataques de chama (a ser mudado)
-    if (count%200==0) {
+    if (count%200==0 && startfight) {
         createFlameAttack(boss.position);
     }
 
@@ -609,26 +624,34 @@ function createFlameAttack(position) {
     // mover para a posição atual do jogador
     const targetPosition = player.position.clone();
     const direction = targetPosition.sub(flame.position).normalize();//calculo do vetor de movimento para o ataque
-    const speed = 0.1;
+    const speed = 0.15;
 
     function moveFlame() {
-        flame.position.addScaledVector(direction, speed);
-        if (flame.position.distanceTo(player.position) < 0.05) {
-            console.log("hit");          
-            scene.remove(flame);
+    if (!flame.userData.hasHit) {
+        if (flame.position.distanceTo(player.position) < 0.5) { 
+            console.log("hit");
             playerHp--;
             updateHpDisplay();
-
-        }
-        if (flame.position.distanceTo(position) > 20) {
-            scene.remove(flame);
+            flame.userData.hasHit = true;
+            setTimeout(() => scene.remove(flame), 0); 
+            return; 
         }
     }
 
-    function animateFlame() {
-        moveFlame();
-        requestAnimationFrame(animateFlame);
+    flame.position.addScaledVector(direction, speed);
+
+    if (flame.position.distanceTo(position) > 20) {
+        scene.remove(flame);
     }
+}
+
+function animateFlame() {
+    moveFlame();
+    requestAnimationFrame(animateFlame);
+}
+
+
+flame.userData.hasHit = false;
     animateFlame();
 }
 
