@@ -103,7 +103,6 @@
 
 
 
-
     //load do modelo do boss configuração da sua posição e inicio de logica para as animações
     const loader3 = new GLTFLoader();
     let boss, bossMixer;
@@ -400,7 +399,7 @@ function moveLight() {
     followLight.position.set(player.position.x, player.position.y, player.position.z);
     scene.add(followLight);
 
-    const bossSpotlight = new THREE.SpotLight(0x660000, 5);
+    const bossSpotlight = new THREE.SpotLight(0x330000, 10);
     bossSpotlight.position.set(0, 15, 0);
     bossSpotlight.target.position.set(0, 5, 0);
     bossSpotlight.angle = Math.PI / 4;
@@ -453,9 +452,17 @@ function moveLight() {
     
     tickFunctions.forEach(fn => fn(delta));
     console.log(startfight);
+    if (player.position.x<-5 && !cuttrig){
+        followLight.intensity=4;
+        followLight.distance=4;
+    
+    }
+
     if (player.position.x<-14 && !cuttrig){
-        cutscene=true;
+        cutscene=true
         cuttrig=true;
+        followLight.intensity=10;
+        followLight.distance=10;
         canMove = false;
         setTimeout(() => {
             startfight = true
