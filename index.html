@@ -1,13 +1,9 @@
 <!DOCTYPE html>
+
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
+<meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Three.js Dungeon</title>
-    <style>
-        body { margin: 0; overflow: hidden; height: 100%; }
-        html, body { height: 100%; }
-    </style>
     <style>
         body { margin: 0; overflow: hidden; height: 100%; }
         html, body { height: 100%; }
@@ -15,75 +11,167 @@
             position: absolute;
             width: 100%;
             height: 100%;
-            background: black;
+            background: rgba(0, 0, 0, 0.9);
             display: flex;
             justify-content: center;
             align-items: center;
             flex-direction: column;
             color: white;
         }
+        #difficultySelect {
+            display: none;
+            flex-direction: column;
+            gap: 10px;
+        }
+        #hpDisplay {
+            display: none;
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            font-size: 24px;
+            color: white;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .heart {
+            color: red;
+            font-size: 24px;
+            margin-right: 4px;
+        }
         button {
             padding: 10px 20px;
             font-size: 20px;
             cursor: pointer;
+            background: #333;
+            color: white;
+            border: none;
+            border-radius: 5px;
+        }
+        button:hover {
+            background: #555;
         }
     </style>
 </head>
 <body>
     <div id="menu">
+        
         <h1>The Dungeon</h1>
-        <button id="startButton">Start Game</button>
+        <button id="startButton">Play</button>
+        <div id="difficultySelect">
+            <h2>Select Difficulty</h2>
+            <button class="diffButton" data-multiplier="1">Easy</button>
+            <button class="diffButton" data-multiplier="0.5">Hard</button>
+            <button class="diffButton" data-multiplier="0.07">Nightmare</button>
+        </div>
     </div>
-    <div id="hpDisplay" style="
-    position: absolute;
-    top: 10px;
-    left: 10px;
-    font-size: 24px;
-    color: white;
-    background: rgba(0, 0, 0, 0.7);
-    padding: 10px;
-    border-radius: 5px;
-">
-    HP: <span id="hpValue">5</span>
-    BOSSHP: <span id="bossHpValue">30</span>
-</div>
-</head>
-<script type="importmap">
-    {
-        "imports": {
-            "three": "./build/three.module.js",
-            "three/addons/": "./jsm/"
-        }
-    }
-</script>
+    
 
-<script type="module">
-    import * as THREE from 'three';
-    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-    import { Raycaster, Vector3 } from 'three';
-    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-    import { TextureLoader } from 'three';
-    document.getElementById("startButton").addEventListener("click", function() {
-            document.getElementById("menu").style.display = "none";
-            startGame();
-        });
+    <div id="hpDisplay">
+        <div id="hpHearts"></div>
+    </div>
+
+    <script type="importmap">
+        {"imports": {"three": "./build/three.module.js","three/addons/": "./jsm/"}}
+    </script>
+    <script type="module">
+        import * as THREE from 'three';
+        
+        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+        import { TextureLoader } from 'three';
+
+        const startButton = document.getElementById('startButton');
+        const difficultySelect = document.getElementById('difficultySelect');
+        const diffButtons = document.querySelectorAll('.diffButton');
+        let difficultyMultiplier = 1;
+        const playerLoader = new GLTFLoader();
+        let player;
+        let playerMixer;
+        const playerActions = {};
+
+        function playPlayerAnimation(name, loop = false, nextAnimation = null) {
+            //console.log(name)
+        const action = playerActions[name];
+        //console.log(action)
+        if (!action) return;
 
         
-    function startGame() {
-        let playerHp = 5;  // vida jogador
-        let bossHp = 30;   // vida inimigo
+        Object.values(playerActions).forEach(a => a.stop());
 
-    // funcoes para atualizar o display de hp do jogador e do inimigo o do inimigo será removido
+        action
+            
+            .setLoop(loop ? THREE.LoopRepeat : THREE.LoopOnce, loop ? Infinity : 1)
+            .reset();
+        action.clampWhenFinished = !loop;
+        action.play();
 
-    function updateHpDisplay() {
-    document.getElementById('hpValue').innerText = playerHp;
-    }
-    function updateBossHpDisplay() {
-    document.getElementById('bossHpValue').innerText = bossHp;
-}
+        
+        if (!loop && nextAnimation) {
+            const onFinish = (event) => {
+            if (event.action === action) {
+                playPlayerAnimation(nextAnimation, false);
+                playerMixer.removeEventListener('finished', onFinish);
+            }
+            };
+            
+            playerMixer.removeEventListener('finished', onFinish);
+            playerMixer.addEventListener('finished', onFinish);
+        }
+        }
 
-    // Criar a cena a camera de perspetiva paralela á cena com inclinação para melhorar a visão tridimensional da cena, e o renderer
+        startButton.addEventListener('click', () => {
+            startButton.style.display = 'none';
+            difficultySelect.style.display = 'flex';
+        });
+
+        diffButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+        difficultyMultiplier = parseFloat(btn.dataset.multiplier);
+        document.getElementById('menu').style.display = 'none';
+        document.getElementById('hpDisplay').style.display = 'block';
+
+        playerLoader.load('ghost.glb', (gltf) => {
+            player = gltf.scene;
+            player.position.set(259, 1, -10);
+            player.scale.set(0.7,0.7,0.7);
+            
+
+            playerMixer = new THREE.AnimationMixer(player);
+            
+            
+            gltf.animations.forEach(clip => {
+                playerActions[clip.name] = playerMixer.clipAction(clip);
+            });
+            
+            startGame(difficultyMultiplier);
+        });
+    });
+})
+        function startGame(dif) {
+            let playerHp = Math.floor(15 * dif);
+            let bossHp = 30;
+
+            function updateHpDisplay() {
+                const container = document.getElementById('hpHearts');
+                container.innerHTML = '';
+                for (let i = 0; i < playerHp; i++) {
+                    container.innerHTML += '<span class="heart">♥</span>';
+                }
+            }
+
+            
+            updateHpDisplay();
+    
+    
     const scene = new THREE.Scene();
+    const teleportLight = new THREE.SpotLight(0xff0000, 10); 
+    teleportLight.position.set(-20, 8, -10);
+    teleportLight.angle = Math.PI / 6;
+    teleportLight.penumbra = 0.5;
+    teleportLight.decay = 2;
+    teleportLight.distance = 50;
+    teleportLight.visible = false;
+    scene.add(teleportLight);
     const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
     const renderer = new THREE.WebGLRenderer();
     renderer.setSize(window.innerWidth, window.innerHeight);
@@ -95,8 +183,9 @@
     const groundMaterial = new THREE.MeshLambertMaterial({ color: 0x0f0000 });
     const ground = new THREE.Mesh(groundGeometry, groundMaterial);
     ground.rotation.x = -Math.PI / 2;
+    ground.position.y = -0.35; 
+    ground.position.x= -4.5;
     scene.add(ground);
-
 
 
 
@@ -106,14 +195,66 @@
     //load do modelo do boss configuração da sua posição e inicio de logica para as animações
     const loader3 = new GLTFLoader();
     let boss, bossMixer;
+    
+    
+    let atack3 = false;
+    let playerState = "idle";        
+    let pendingAttack = false;
     let cutscene;
     let startfight=false;
     let canMove = true;
+    let countshot=0;
     let cuttrig = false;
+    let bossState = 'start'
+    let hasSpawnedSpike = false;
+    let spawnedSpike = null;
+    let spikeRiseStart = 0;
+    let spikeStrikeDuration = 0.15
+    let spikeState = 'warning';
+    let spikeTimer = 0.5;
+    let stateTimer = 0;
+    let spikeRetractDuration = 0.3;
+    let spikeMaxHeight = 20;
+    let spikeRetractStart = 0;
+    let spawnedSpikes = [];
+    let spikeRiseStartTimes = [];
+    let hasTakenDangerZoneDamage = false;
+    let hasPlayedTeleportAnim = false;
+    let hasPlayedAttack1Anim = false;
+    let hasPlayedAttack2Anim = false;
     let tickFunctions = []
+    let spikeDamageTaken = [];
+    let fallingSpikes = [];
+    let fallingSpikeData = [];
+    let spikeFallDuration;
+    let spikeFallSpeed;
+    let spikeFallDamageThreshold;
+    let spikeSpawnInterval;
+    let nextSpikeSpawn;
+    let spikeWaveIndex = 0;
+    let spikeWaveTimer = 0;
+    let totalFallingSpikes;
+    let maxSpikeWaves = 5;
+
+    let spikeWaveCooldown = 1.5;
+    let columnSpacing = 2;
+    let minX = -38;
+    let maxX = 18;
+    let maxFallingSpikes;
+    let hasPlayedAttack3Anim = false;
+    const spikeDamageThreshold = 1.25; // Half-width margin for hitbox
+    let hasTakenSpikeDamage = false;  // Prevent repeated damage during a single attack
+    let hasPlayedIdleAnim = false;
     const clock = new THREE.Clock();    
     let bossAnimations = {};
-    loader3.load('introevoo2.glb', function (gltf) {
+    const loaderlava = new GLTFLoader();
+    let mixer;
+    
+
+    scene.add(player);
+
+    
+    loader3.load('introevoo3.glb', function (gltf) {
         boss = gltf.scene;
         boss.position.set(-20, 6, -10);
         boss.scale.set(2, 2, 2);
@@ -122,45 +263,445 @@
    
         bossMixer = new THREE.AnimationMixer(boss);
         
+        
         gltf.animations.forEach((clip) => {
             bossAnimations[clip.name] = bossMixer.clipAction(clip);
         });
-        playBossAnimation('Armature.001Action', true, 'Action.007');
+        //playBossAnimation('Armature.001Action', false, 'attack1');
          
 })
+
        
+function createSpike(position) {
+    const geometry = new THREE.ConeGeometry(0.5, 1, 12); 
+    geometry.translate(0, 0.5, 0); 
+    const material = new THREE.MeshStandardMaterial({
+        color: 0x770000,        
+        metalness: 0.5,         
+        roughness: 0.1,        
+        emissive: 0x440000,     
+        emissiveIntensity: 0.5  
+    });
+    const spike = new THREE.Mesh(geometry, material);
+    spike.position.copy(position);
+    scene.add(spike);
+    return spike;
+}
+
+function createFallingNeedle(position) {
+    const geometry = new THREE.CylinderGeometry(0.1, 0.4, 6, 6); 
+    const material = new THREE.MeshStandardMaterial({
+        color: 0xff0000,   
+        metalness: 1.0,    
+        roughness: 0.2,     
+        emissive: 0xff4444,    
+        emissiveIntensity: 0.5
+    });
+    const needle = new THREE.Mesh(geometry, material);
+    needle.position.copy(position);
+    needle.rotation.x = Math.PI; 
+    scene.add(needle);
+    return needle;
+}
    
 
 
 // funcao para a execução das animações preparadas no blender de forma sucinta tem possibilidade de ter uma animação em loop ou não e a indicação da próxima animação os movimentos do boss serão maioritariamente definidos por uma sequência 
 // de movimentos (animações) realizadas desta forma. 
 function playBossAnimation(name, loop = false, nextAnimation = null) {
-    if (!bossAnimations[name]) {
-        console.warn(`Animation "${name}" not found.`);
-        return;
-    }
-
-    
-    Object.values(bossAnimations).forEach(action => action.stop());
+    //console.log("Playing animation:", name);
 
     const action = bossAnimations[name];
-    action.reset().play();
+    if (!action) return;
 
     
-    action.setLoop(loop ? THREE.LoopRepeat : THREE.LoopOnce, Infinity);
+    Object.values(bossAnimations).forEach(a => a.stop());
+
+   
+    action.setLoop(loop ? THREE.LoopRepeat : THREE.LoopOnce, loop ? Infinity : 1);
     action.clampWhenFinished = !loop;
 
     
+    action.reset();
+    action.play();
+
+    
     if (!loop && nextAnimation) {
-        action.getClip().duration;  
-        action._mixer.addEventListener('finished', function transition(event) {
+        const onFinish = function (event) {
             if (event.action === action) {
-                playBossAnimation(nextAnimation, true); 
-                action._mixer.removeEventListener('finished', transition);
+                playBossAnimation(nextAnimation, false);
+                action._mixer.removeEventListener('finished', onFinish);
             }
-        });
+        };
+        action._mixer.removeEventListener('finished', onFinish); 
+        action._mixer.addEventListener('finished', onFinish);
     }
 }
+
+
+function updateBossState(dt) {
+    //console.log(bossState);
+    //console.log(boss.position);
+    if (!boss) return;
+    
+
+    const dist = boss.position.distanceTo(player.position);
+    //console.log(player.position.x)
+    switch (bossState) {
+        case "start":
+            if (stateTimer <= 0) {
+                playBossAnimation('Armature.001Action', false);
+                stateTimer = 5;
+            } else {
+                stateTimer -= dt;
+                if (stateTimer <= 0) {
+                    bossState = 'idle';
+                    stateTimer = 1.5;
+                    hasPlayedIdleAnim = false;
+                }
+            }
+            break;
+
+        case 'idle':
+            if (!hasPlayedIdleAnim) {
+                playBossAnimation('idle', false, "idle");
+                hasPlayedIdleAnim = true;
+                stateTimer = 1.5;
+                break;
+            }
+
+            if (stateTimer > 0) {
+                stateTimer -= dt;
+                break;
+            }
+
+            if (dist < 2000) {
+            const attacks = ['attack1','attack1','attack2','attack2','attack3'];
+            const randomIndex = Math.floor(Math.random() * attacks.length);
+            bossState = attacks[randomIndex];
+
+                stateTimer = 0;
+                countshot = 0;
+                hasPlayedIdleAnim = false;
+                hasPlayedAttack1Anim = false;
+                hasPlayedTeleportAnim = false;
+                if (bossState === 'attack1') stateTimer = 1.15;
+                if (bossState === 'attack4') stateTimer = 3;
+            }
+            break;
+
+        case 'attack1':
+            //console.log(countshot)
+            //console.log(stateTimer)
+            if (!hasPlayedAttack1Anim) {
+                //console.log("Playing attack1 anim");
+                playBossAnimation('attack1', false);
+                hasPlayedAttack1Anim = true;
+                hasTakenDangerZoneDamage = false;
+                stateTimer = 1.15;
+                return;
+            }
+            if (countshot >= 10 && countshot <= 30) {
+                
+            const playerX = player.position.x;
+            //console.log(playerX)
+            if (playerX <= -4 && playerX >= -15 && !hasTakenDangerZoneDamage) {
+            playerHp -= 2;
+            updateHpDisplay();
+            
+            hasTakenDangerZoneDamage = true;
+        }
+    }
+            if (stateTimer > 0) {
+                stateTimer -= dt;
+                break;
+            }
+
+            countshot += 1;
+
+            if (countshot>30 && countshot<60 && countshot % 5 === 0) {
+                createFlameAttack2(boss.position);
+            }
+
+            
+
+            if (countshot > 106) {
+                bossState = 'teleport';
+                stateTimer = 3; // TP animation duration
+                hasPlayedTeleportAnim = false;
+                countshot = 0;
+            }
+            break;
+       case 'attack2':
+    if (!hasPlayedAttack2Anim) {
+        //console.log("Playing attack2 anim");
+        playBossAnimation('attack2', false);
+        hasPlayedAttack2Anim = true;
+
+        spawnedSpikes = [];
+        spikeRiseStartTimes = [];
+        spikeDamageTaken = [];
+
+        spikeState = 'warning';
+        spikeTimer = 1;
+        spikeStrikeDuration = 0.15;
+        spikeRetractDuration = 0.2;
+        stateTimer = 1.7;
+
+        for (let x = 18; x >= -38; x -= 3.8) {
+            const position = new THREE.Vector3(x, 0, player.position.z);
+            const spike = createSpike(position);
+            spike.scale.set(1, 0.01, 1);
+            spawnedSpikes.push(spike);
+            spikeRiseStartTimes.push(performance.now());
+            spikeDamageTaken.push(false);
+        }
+
+        return;
+    }
+
+    const now = performance.now();
+
+    for (let i = 0; i < spawnedSpikes.length; i++) {
+        const spike = spawnedSpikes[i];
+        if (!spike) continue;
+
+        const start = spikeRiseStartTimes[i];
+        const elapsed = (now - start) / 1000;
+
+        if (spikeState === 'warning') {
+            spike.scale.y = Math.min(0.2, 0.01 + elapsed * 0.5);
+        } else if (spikeState === 'attack') {
+            const progress = Math.min((elapsed - spikeTimer) / spikeStrikeDuration, 1);
+            spike.scale.y = 0.2 + (spikeMaxHeight - 0.2) * progress;
+        } else if (spikeState === 'retract') {
+            const retractElapsed = (now - spikeRetractStart) / 1000;
+            const retractProgress = Math.min(retractElapsed / spikeRetractDuration, 1);
+            spike.scale.y = spikeMaxHeight * (1 - retractProgress);
+        }
+        if ((spikeState === 'attack' || spikeState === 'retract') && !spikeDamageTaken[i]) {
+        const dx = Math.abs(player.position.x - spike.position.x);
+        if (dx <= spikeDamageThreshold) {
+            playerHp -= 1;
+            updateHpDisplay();
+            
+            spikeDamageTaken[i] = true;
+        }
+    }
+
+    }
+    
+ 
+    if (spikeState === 'warning' && (now - spikeRiseStartTimes[0]) / 1000 >= spikeTimer) {
+        spikeState = 'attack';
+    }
+
+    
+    if (spikeState === 'attack' && stateTimer <= 0) {
+        spikeState = 'retract';
+        spikeRetractStart = now;
+        break;
+    }
+
+    
+    if (spikeState === 'retract') {
+        const retractElapsed = (now - spikeRetractStart) / 1000;
+        if (retractElapsed >= spikeRetractDuration) {
+            for (let spike of spawnedSpikes) {
+                scene.remove(spike);
+                spike.geometry.dispose();
+                spike.material.dispose();
+            }
+            spawnedSpikes = [];
+            hasTakenSpikeDamage = false;
+            bossState = 'teleport';
+            hasPlayedAttack2Anim = false;
+            hasPlayedTeleportAnim = false;
+            stateTimer = 3;
+            break;
+        }
+    }
+
+    if (spikeState !== 'retract') {
+        stateTimer -= dt;
+    }
+    break;
+    case 'attack3':
+    if (!hasPlayedAttack3Anim) {
+        //console.log("Playing attack3 anim");
+        atack3=true;
+        playBossAnimation('attack3', false);
+        hasPlayedAttack3Anim = true;
+
+        fallingSpikes = [];
+        fallingSpikeData = [];
+
+        spikeFallSpeed = 15; 
+        spikeFallDamageThreshold = 3;
+        spikeWaveIndex = 0;
+        spikeWaveCooldown = 1.5; 
+        spikeWaveTimer = 0;
+        maxSpikeWaves = 8;
+
+        columnSpacing = 2;
+        minX = -38;
+        maxX = 18;
+
+        stateTimer = 15
+        return;
+    }
+
+    const shouldSpawnWave = spikeWaveIndex < maxSpikeWaves && spikeWaveTimer <= 0;
+    if (shouldSpawnWave) {
+        
+        const spikeXPositions = [];
+        const offset = Math.floor(Math.random() * 2);
+        for (let x = minX+offset; x <= maxX+offset; x += columnSpacing) {
+            spikeXPositions.push(x);
+        }
+
+        
+        const numGaps =  5;
+        const gapIndices = new Set();
+        while (gapIndices.size < numGaps) {
+            gapIndices.add(Math.floor(Math.random() * spikeXPositions.length));
+        }
+
+        
+        for (let i = 0; i < spikeXPositions.length; i++) {
+            if (gapIndices.has(i)) continue;
+            const x = spikeXPositions[i];
+            const y = 60;
+            const spike = createFallingNeedle(new THREE.Vector3(x, y, player.position.z));
+            fallingSpikes.push(spike);
+            fallingSpikeData.push({ y: y, hasDamaged: false });
+        }
+
+        spikeWaveIndex++;
+        spikeWaveTimer = spikeWaveCooldown;
+    }
+
+    
+    if (spikeWaveTimer > 0) {
+        spikeWaveTimer -= dt;
+    }
+
+    
+    for (let i = fallingSpikes.length - 1; i >= 0; i--) {
+        const spike = fallingSpikes[i];
+        const data = fallingSpikeData[i];
+        if (!spike) continue;
+
+        data.y -= spikeFallSpeed * dt;
+        spike.position.y = data.y;
+
+        
+        const dx = Math.abs(player.position.x - spike.position.x);
+        const dz = Math.abs(player.position.z - spike.position.z);
+        const dy = Math.abs(player.position.y - spike.position.y);
+
+        if (!data.hasDamaged && dx <= 0.4 && dz <= 0.4 && dy <= spikeFallDamageThreshold) {
+            playerHp -= 1;
+            updateHpDisplay();
+           
+            data.hasDamaged = true;
+        }
+
+      
+        if (data.y < -5) {
+            scene.remove(spike);
+            spike.geometry.dispose();
+            spike.material.dispose();
+            fallingSpikes.splice(i, 1);
+            fallingSpikeData.splice(i, 1);
+        }
+    }
+
+   
+    if (stateTimer > 0) {
+        stateTimer -= dt;
+        break;
+    }
+
+    // Cleanup
+    for (let spike of fallingSpikes) {
+        scene.remove(spike);
+        spike.geometry.dispose();
+        spike.material.dispose();
+    }
+    fallingSpikes = [];
+    fallingSpikeData = [];
+
+    bossState = 'teleport';
+    hasPlayedAttack3Anim = false;
+    hasPlayedTeleportAnim = false;
+    stateTimer = 3;
+    atack3=false
+    break;
+        case 'teleport':
+            
+            if (!hasPlayedTeleportAnim) {
+                
+                spawnSimpleSmoke(boss.position);
+                playBossAnimation('idle2', false); // play teleport-idle animation
+                hasPlayedTeleportAnim = true;
+                stateTimer = 0.9; 
+                break;
+            }
+
+            if (stateTimer > 0) {
+                stateTimer -= dt;
+                break;
+            }
+
+            teleportLight.visible = false;
+            bossState = 'idle';
+            stateTimer = 1.5;
+            hasPlayedIdleAnim = false;
+            break;
+        }
+
+    bossMixer && bossMixer.update(dt);
+}
+
+const smokeTexture = new THREE.TextureLoader().load('smoke.jpg');
+const smokeMaterial = new THREE.SpriteMaterial({
+    map: smokeTexture,
+    transparent: true,
+    opacity: 0.6,
+});
+function spawnSimpleSmoke(position) {
+    const smokeMaterial = new THREE.MeshBasicMaterial({
+        map: smokeTexture,
+        transparent: true,
+        opacity: 0.6,
+        depthWrite: false,
+    });
+
+    const geometry = new THREE.SphereGeometry(2, 32, 32);
+    const sphere = new THREE.Mesh(geometry, smokeMaterial);
+    sphere.position.copy(position);
+    sphere.position.x+=5
+    scene.add(sphere);
+
+    const fadeDuration = 1.5;
+    let elapsed = 0;
+
+    function fadeOut(delta) {
+        elapsed += delta;
+        sphere.material.opacity = THREE.MathUtils.lerp(0.7, 0, elapsed / fadeDuration);
+        if (elapsed >= fadeDuration) {
+            scene.remove(sphere);
+            sphere.geometry.dispose();
+            sphere.material.dispose();
+            return;
+        }
+        requestAnimationFrame(() => fadeOut(0.016));
+    }
+
+    fadeOut(0);
+}
+
 
 
 
@@ -172,6 +713,9 @@ tickFunctions.push((delta) => {
     // só começar animação quando o jogador chegar a uma certa distância
     if (bossMixer && cutscene) {
         bossMixer.update(delta);
+    }
+        if ( playerMixer ) {
+    playerMixer.update( delta );
     }
 
     //verificar se uma animação terminou
@@ -229,13 +773,23 @@ tickFunctions.push((delta) => {
 
 // luz para as chamas dos postes
 function createFlameLight(x, y, z) {
-    const flameLight = new THREE.PointLight(0x66aa66, 4, 10);
+    const flameLight = new THREE.PointLight(0xaa6600, 10, 50);
     flameLight.position.set(x, y + 2, z - 1);
     scene.add(flameLight);
 
 
+    let modelo = null;
+    const loader5 = new GLTFLoader();
+    loader5.load('escada.glb', function (gltf) {
+    const modelo = gltf.scene;
+    modelo.position.set(150, 0, -10);   // posição do modelo
+    modelo.scale.set(2, 2, 2);        // escala do modelo
+    modelo.rotation.y = 0;  // rotação (opcional)
 
-
+    scene.add(modelo);                // adiciona o modelo à cena
+}, undefined, function (error) {
+    console.error('Erro ao carregar o modelo:', error);
+});
 
 
 // importar o modelo das chamas e a animação
@@ -251,7 +805,7 @@ function createFlameLight(x, y, z) {
             if (child.isMesh) {
                 child.castShadow = false;
                 child.receiveShadow = false;
-                child.material.emissive = new THREE.Color(0x7777bb); 
+                child.material.emissive = new THREE.Color(0xFF0000); 
                 child.material.emissiveIntensity = 2; 
             }
         });
@@ -265,7 +819,7 @@ function createFlameLight(x, y, z) {
             action.play();
         });
 
-        // Guardar as chamas no array isto é uusado para a sua remoção posterior
+
         flames.push({ flame, flameLight, position: new THREE.Vector3(x, y, z), mixer });
 
         //atualizar a animação
@@ -285,6 +839,9 @@ function createFlameLight(x, y, z) {
 //parametros para o movimento das chamas
 let lightMovementSpeed = 0.001; // velocidade
 let maxLightOffset = 0.5; // Max offset
+
+
+// Simple smoke spawn function
 
 
 // função utilizada para a alteração das light sources de forma a se comportarem como chamas.
@@ -312,40 +869,17 @@ function moveLight() {
 
             
     // adicionar colunas á cena      
-        createColumn(10, -3);
-        createColumn(30, -3);
         createColumn(50, -3);
-        createColumn(70, -3);
-        createColumn2(20, -2);
-        createColumn2(40, -2);
+        createColumn(70, -3);        
         createColumn2(60, -2);
         createColumn2(80, -2);
 
 
-    // gometria do jogador (todo a substituir por um modelo)
-    const playerGeometry = new THREE.BoxGeometry(1, 1, 1);
-    const playerMaterial = new THREE.MeshBasicMaterial({ color: 0x0000ff });
-    const player = new THREE.Mesh(playerGeometry, playerMaterial);
-    player.position.set(90, 1, -10);
-    //player.position.set(-20, 1, -10);
-    scene.add(player);
+    
 
     
     camera.position.set(0, 2, 20);
-    //importar a parede de fundo
-    const loader = new GLTFLoader();
-    loader.load('bancada.gltf', function (gltf) {
-    const model = gltf.scene;
-    model.rotation.y=0;
-    model.rotation.x=-0.0
-    model.rotation.z=3.14
-    model.scale.set(1, 1, 1);
-    model.position.x=-40;
-    model.position.z=0;
-    model.position.y=30;
-    //model.rotation(90)
-    scene.add(model);
-});
+    
 
 
 
@@ -356,10 +890,18 @@ function moveLight() {
     window.addEventListener('keydown', (event) => { keys[event.code] = true; });
     window.addEventListener('keyup', (event) => { keys[event.code] = false; });
     // listener para o clique do rato (ataque)
-    document.addEventListener("mousedown", (event) => {
-    if (event.button === 0) { 
-        console.log("fire")
-        playerAttack();
+    let lastAttackTime = 0;
+    const attackCooldown = 500; 
+
+// Listener
+document.addEventListener("mousedown", (event) => {
+    if (event.button === 0) {
+        const now = performance.now();
+        if (now - lastAttackTime >= attackCooldown) {
+            lastAttackTime = now;
+            console.log("fire");
+            playerAttack();
+        }
     }
 });
 
@@ -386,8 +928,8 @@ function moveLight() {
     let velocityY = 0;
     let isJumping = false;
     let peakReached = false;
-    const boundaryp=80
-    const boundaryn=-38
+    let boundaryp=259;
+    let boundaryn=-30;
     
 
 
@@ -398,17 +940,54 @@ function moveLight() {
     const followLight = new THREE.PointLight(0xffffff, 10, 10);
     followLight.position.set(player.position.x, player.position.y, player.position.z);
     scene.add(followLight);
+    
+     
+    const Spot1 = new THREE.PointLight(0x000000, 10, 500);
+    Spot1.position.set(240, 0, 50);
+    Spot1.angle    = Math.PI / 6;
+    Spot1.penumbra = 0.2;
+    Spot1.decay    = 0.1;
+    scene.add(Spot1);
+    
+    const redSpot2 = new THREE.PointLight(0xff0000, 10, 20);
+    redSpot2.position.set(240, 0, -10);
+    redSpot2.angle    = Math.PI / 6;
+    redSpot2.penumbra = 0.2;
+    redSpot2.decay    = 2;
+    scene.add(redSpot2);
 
-    const bossSpotlight = new THREE.SpotLight(0x330000, 10);
+   
+    
+    const bossSpotlight = new THREE.SpotLight(0x330000, 10,20);
     bossSpotlight.position.set(0, 15, 0);
     bossSpotlight.target.position.set(0, 5, 0);
     bossSpotlight.angle = Math.PI / 4;
     bossSpotlight.penumbra = 0.5;
     bossSpotlight.castShadow = true;
-    bossSpotlight.visible = false; // Initially hidden
+    bossSpotlight.visible = false; 
     scene.add(bossSpotlight);
     scene.add(bossSpotlight.target);
 
+
+    const spotlight = new THREE.SpotLight(0xffffff, 20,20); 
+    spotlight.position.set(-10, 50, -10); 
+    spotlight.angle = Math.PI / 6; 
+    spotlight.penumbra = 0.2; 
+    spotlight.decay = 2;
+    spotlight.distance = 100;
+    spotlight.visible=false;
+
+    spotlight.castShadow = true; 
+    scene.add(spotlight);
+
+    
+    const light = new THREE.AmbientLight( 0xFFaaaa,2.0 ); 
+    scene.add( light );
+    
+
+    
+
+   
 
 
 
@@ -418,8 +997,11 @@ function moveLight() {
     let lastDirection = 1; // 1 direita, -1 esquerda
     let canDash = true;
     let isDashing=false;
-    var lastdashtime=0
-    var dashCooldown=1500
+    var lastdashtime=0;
+    var dashCooldown=1500;
+    let Fall = false;
+    let lowheight= false;
+    let isAttacking=false;
 
     //parametros logica para cooldowns e outros controlos
     let count=0
@@ -435,30 +1017,92 @@ function moveLight() {
     if (playerHp <= 0) {
             gameOver();
         }
-    console.log(bossHp)
+    //console.log(bossHp)
     if (bossHp <= 0) {
         defeatBoss();
     }
-
+    const delta = clock.getDelta(); 
     requestAnimationFrame(animate);
     //iniciar cutscene do boss
     if (cutscene) {
+    spotlight.visible=true;
+    updateBossState(delta);
     bossSpotlight.visible = true;
     bossSpotlight.position.set(boss.position.x, boss.position.y + 10, boss.position.z + 5);
     bossSpotlight.target.position.set(boss.position.x, boss.position.y, boss.position.z);
     }
 
-    const delta = clock.getDelta(); 
+    let nextState;
+        if (lastDirection === -1) {
+    player.rotation.y = 0;           
+    } else {
+    player.rotation.y = Math.PI;     
+    }
+    if (pendingAttack) {
+    nextState = "attack";
+    } else if (isDashing) {
+    nextState = "dash";
+    } else if (keys["KeyA"] || keys["KeyD"]) {
+    nextState = "move";
+    } else {
+    nextState = "idle";
+    }
+
+
+if (nextState !== playerState) {
+  playerState = nextState;
+  switch (playerState) {
+    case "idle":
+      playPlayerAnimation("Idle1", true);
+      break;
+    case "move":
+      playPlayerAnimation("Move", true);
+      break;
+    case "dash":
+      playPlayerAnimation("Dash", false);
+      break;
+    case "attack":
+      isAttacking = true;
+      playPlayerAnimation("Attack", false, "idle");
+     
+      playerMixer.addEventListener("finished", function onEnd(e) {
+        if (e.action.getClip().name === "Attack") {
+          isAttacking = false;
+          pendingAttack = false;
+          playerMixer.removeEventListener("finished", onEnd);
+        }
+      });
+      break;
+  }
+}
+    
+
+        
+    
     
     tickFunctions.forEach(fn => fn(delta));
-    console.log(startfight);
+    
     if (player.position.x<-5 && !cuttrig){
         followLight.intensity=4;
         followLight.distance=4;
     
     }
 
-    if (player.position.x<-14 && !cuttrig){
+    if ((player.position.x<245 && player.position.x>234)||(player.position.x<215.7 && player.position.x>204.7)){
+        Fall=true;
+    }
+    else{
+        Fall=false;
+    }
+    if (player.position.y<0){
+        lowheight=true;
+    }
+    else{
+        lowheight=false;
+}
+    //console.log("X DO PERSONAGEm")
+    //console.log(player.position.x)
+    if (player.position.x<5.92 && !cuttrig){
         cutscene=true
         cuttrig=true;
         followLight.intensity=10;
@@ -470,37 +1114,40 @@ function moveLight() {
             }, 2000);
     }
     // remover as chamas do array e as luzes
-    flames.forEach((flameObject, index) => {
-        if (player.position.x < 10) {
-            scene.remove(flameObject.flame);  
-            scene.remove(flameObject.flameLight);  
-            flames.splice(index, 1);  
-            
-
-            setTimeout(() => {
-            
-            }, 2000);
-        }
-    });
+    
 
     //console.log("Time since last dash:", Date.now() - lastdashtime);
     //console.log("Can dash:", Date.now() - lastdashtime >= dashCooldown);
 
     //tempos para controlo de cooldowns
+    
+    
     let now = Date.now();
     let deltaTime = (now - lastTime) / 1000;
     lastTime = now;
     // todos os movimentos sao regulados pelo delta time para consistencia com as animacoes independetemente de fps
     if (!isDashing & canMove) {
+        if (lowheight==true){
+            boundaryn=293;
+            boundaryp=303;
+        }
+        if (cutscene){
+            boundaryp=69;
+            boundaryn=-30
+        }
+        else{
+            boundaryp=259;
+            boundaryn=-30;
+        }
         
         if (keys["KeyD"] && player.position.x > boundaryn) {
-            player.position.x -= 20 * deltaTime;
+            player.position.x -= 10 * deltaTime;
             lastDirection = -1;
         }
 
         
         if (keys["KeyA"] && player.position.x < boundaryp) {
-            player.position.x += 20 * deltaTime; 
+            player.position.x += 10 * deltaTime; 
             lastDirection = 1;
         }
 
@@ -512,7 +1159,7 @@ function moveLight() {
             let dashStartTime = Date.now();
             function dashMove() {
                 let elapsed = Date.now() - dashStartTime;
-                if (elapsed < dashDuration && player.position.x>-38) {
+                if (elapsed < dashDuration && player.position.x>-30) {
                     player.position.x += lastDirection * 100 * deltaTime; // movimento ajustado com delta time
                     requestAnimationFrame(dashMove);
                 } else {
@@ -532,7 +1179,7 @@ function moveLight() {
     
 
     // Aplicar gravidade aos saltos
-    if (isJumping) {
+    if (isJumping || Fall) {
         player.position.y += velocityY * deltaTime; 
         velocityY += gravity * deltaTime; 
 
@@ -541,14 +1188,23 @@ function moveLight() {
             peakReached = true;
             gravity = gravity / 2;
         }
+        if (player.position.y <= -3 && Fall==true) {
+            player.position.y = -3;
+            isJumping = false;
+            velocityY = 0;
+            gravity = -60;
+            playerHp-=1000
+        }
 
         // verificar se o jogador já aterrou
-        if (player.position.y <= 1) {
+        if (player.position.y <= 1 && Fall==false) {
             player.position.y = 1;
             isJumping = false;
             velocityY = 0;
             gravity = -60;
         }
+        if(player.position.y<=-3)
+        playerHp-=1000;
     }
 
 
@@ -558,13 +1214,14 @@ function moveLight() {
     count = count+1;
     
     // geração de ataques de chama (a ser mudado)
-    if (count%200==0 && startfight) {
-        createFlameAttack(boss.position);
-    }
+    //if (count%200==0 && startfight) {
+        //createFlameAttack(boss.position);
+    //}
 
 
 
 
+    const redSpot1 = new THREE.SpotLight(0xff0000, 5, 50);
 
 
     // logica para camara seguir o jogador e do spotlight
@@ -601,12 +1258,13 @@ scene.add(arenaLight);
 function playerAttack() {
     //console.log("ataque");
     canDamage = true;
+    pendingAttack = true;
 
     setTimeout(() => {
         
         checkBossHit();
-    }, 200); 
-    updateBossHpDisplay();
+    }, 330); 
+    //updateBossHpDisplay();
 }
 
 
@@ -648,9 +1306,10 @@ function createFlameAttack(position) {
     flame.position.addScaledVector(direction, speed);
 
     if (flame.position.distanceTo(position) > 20) {
-        scene.remove(flame);
+        //scene.remove(flame);
     }
 }
+
 
 function animateFlame() {
     moveFlame();
@@ -661,6 +1320,71 @@ function animateFlame() {
 flame.userData.hasHit = false;
     animateFlame();
 }
+function createFlameAttack2(originPosition) {
+    const flameGeometry = new THREE.SphereGeometry(0.5, 16, 16);
+    const baseColor = 0xbb1111;
+
+    const baseDirection = player.position.clone().sub(originPosition).normalize();
+
+    
+    const horizontalDirection = baseDirection.clone();
+    horizontalDirection.y = 0;
+    horizontalDirection.normalize();
+
+    const speed = 0.15;
+
+    
+    const arcAngles = [-Math.PI / 6, -Math.PI / 12, Math.PI / 12, Math.PI / 6]; // semi-arch in Y
+
+    for (let angle of arcAngles) {
+        
+        const direction = horizontalDirection.clone();
+
+        
+        const axis = new THREE.Vector3().crossVectors(horizontalDirection, new THREE.Vector3(0, 1, 0)).normalize(); 
+        const quaternion = new THREE.Quaternion().setFromAxisAngle(axis, angle);
+        direction.applyQuaternion(quaternion).normalize();
+
+        const flameMaterial = new THREE.MeshStandardMaterial({
+            color: baseColor,
+            emissive: new THREE.Color(0xff0000),
+            emissiveIntensity: 1000,
+            transparent: true,
+        });
+
+        const flame = new THREE.Mesh(flameGeometry, flameMaterial);
+        flame.position.copy(originPosition);
+        scene.add(flame);
+
+        flame.userData.hasHit = false;
+
+        function moveFlame() {
+            if (!flame.userData.hasHit) {
+                
+                if (flame.position.distanceTo(player.position) < 1) {
+                    console.log("hit");
+                    playerHp--;
+                    updateHpDisplay();
+                    flame.userData.hasHit = true;
+                    setTimeout(() => scene.remove(flame), 0);
+                    return;
+                }
+            }
+
+            flame.position.addScaledVector(direction, speed);
+
+            if (flame.position.distanceTo(originPosition) > 20) {
+                scene.remove(flame);
+                return;
+            }
+
+            requestAnimationFrame(moveFlame);
+        }
+
+        requestAnimationFrame(moveFlame);
+    }
+}
+
 
 
 
@@ -670,17 +1394,18 @@ flame.userData.hasHit = false;
 
 function checkBossHit() {
     
-    if (canDamage) {
+    if (canDamage && !atack3) {
         
         const playerPosition = player.position;
         const bossPosition = boss.position;
         const distance = playerPosition.distanceTo(bossPosition); //distancia entre jogador e boss
 
         
-        const attackRange = 5; // range ataque
+        const attackRange = 10; // range ataque
         if (distance <= attackRange) {
             console.log("Boss hit!");
             bossHp--; //atualizar vida do boss
+            console.log(bossHp)
         }
 
         // flag para evitar mais que 1 dano por ataque

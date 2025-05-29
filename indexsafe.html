@@ -1,0 +1,872 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Three.js Dungeon</title>
+    <style>
+        body { margin: 0; overflow: hidden; height: 100%; }
+        html, body { height: 100%; }
+    </style>
+    <style>
+        body { margin: 0; overflow: hidden; height: 100%; }
+        html, body { height: 100%; }
+        #menu {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background: black;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            color: white;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 20px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div id="menu">
+        <h1>The Dungeon</h1>
+        <button id="startButton">Start Game</button>
+    </div>
+    <div id="hpDisplay" style="
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    font-size: 24px;
+    color: white;
+    background: rgba(0, 0, 0, 0.7);
+    padding: 10px;
+    border-radius: 5px;
+">
+    HP: <span id="hpValue">5</span>
+    BOSSHP: <span id="bossHpValue">30</span>
+</div>
+</head>
+<script type="importmap">
+    {
+        "imports": {
+            "three": "./build/three.module.js",
+            "three/addons/": "./jsm/"
+        }
+    }
+</script>
+
+<script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { Raycaster, Vector3 } from 'three';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+    import { TextureLoader } from 'three';
+    document.getElementById("startButton").addEventListener("click", function() {
+            document.getElementById("menu").style.display = "none";
+            startGame();
+        });
+
+        
+    function startGame() {
+        let playerHp = 5;  // vida jogador
+        let bossHp = 30;   // vida inimigo
+
+    // funcoes para atualizar o display de hp do jogador e do inimigo o do inimigo será removido
+
+    function updateHpDisplay() {
+    document.getElementById('hpValue').innerText = playerHp;
+    }
+    function updateBossHpDisplay() {
+    document.getElementById('bossHpValue').innerText = bossHp;
+}
+
+    // Criar a cena a camera de perspetiva paralela á cena com inclinação para melhorar a visão tridimensional da cena, e o renderer
+    const scene = new THREE.Scene();
+    const teleportLight = new THREE.SpotLight(0xff0000, 10); // bright red
+    teleportLight.position.set(-20, 8, -10);
+    teleportLight.angle = Math.PI / 6;
+    teleportLight.penumbra = 0.5;
+    teleportLight.decay = 2;
+    teleportLight.distance = 50;
+    teleportLight.visible = false;
+    scene.add(teleportLight);
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+
+    
+    // piso (a alterar)
+    const groundGeometry = new THREE.PlaneGeometry(200, 50);
+    const groundMaterial = new THREE.MeshLambertMaterial({ color: 0x0f0000 });
+    const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+    ground.rotation.x = -Math.PI / 2;
+    scene.add(ground);
+
+
+
+
+
+
+
+    //load do modelo do boss configuração da sua posição e inicio de logica para as animações
+    const loader3 = new GLTFLoader();
+    let boss, bossMixer;
+    let cutscene;
+    let startfight=false;
+    let canMove = true;
+    let countshot=0;
+    let cuttrig = false;
+    let bossState = 'start'
+    let stateTimer = 0;
+    let hasPlayedTeleportAnim = false;
+    let hasPlayedAttack1Anim = false;
+    let tickFunctions = []
+    let hasPlayedIdleAnim = false;
+    const clock = new THREE.Clock();    
+    let bossAnimations = {};
+    loader3.load('introevoo3.glb', function (gltf) {
+        boss = gltf.scene;
+        boss.position.set(-20, 6, -10);
+        boss.scale.set(2, 2, 2);
+        boss.rotation.y=-1.57;
+        scene.add(boss);
+   
+        bossMixer = new THREE.AnimationMixer(boss);
+        
+        gltf.animations.forEach((clip) => {
+            bossAnimations[clip.name] = bossMixer.clipAction(clip);
+        });
+        //playBossAnimation('Armature.001Action', false, 'attack1');
+         
+})
+       
+   
+
+
+// funcao para a execução das animações preparadas no blender de forma sucinta tem possibilidade de ter uma animação em loop ou não e a indicação da próxima animação os movimentos do boss serão maioritariamente definidos por uma sequência 
+// de movimentos (animações) realizadas desta forma. 
+function playBossAnimation(name, loop = false, nextAnimation = null) {
+    console.log(name)
+    
+    if (!bossAnimations[name]) {
+        return;
+    }
+
+    
+    Object.values(bossAnimations).forEach(action => action.stop());
+
+    const action = bossAnimations[name];
+    action.reset().play();
+
+    
+    action.setLoop(loop ? THREE.LoopRepeat : THREE.LoopOnce, Infinity);
+    action.clampWhenFinished = !loop;
+
+    
+    if (!loop && nextAnimation) {
+        action.getClip().duration;  
+        action._mixer.addEventListener('finished', function transition(event) {
+            if (event.action === action) {
+                playBossAnimation(nextAnimation, false); 
+                action._mixer.removeEventListener('finished', transition);
+            }
+        });
+    }
+}
+function updateBossState(dt) {
+    //console.log(bossState);
+    //console.log(boss.position);
+    if (!boss) return;
+
+    const dist = boss.position.distanceTo(player.position);
+
+    switch (bossState) {
+        case "start":
+            if (stateTimer <= 0) {
+                playBossAnimation('Armature.001Action', false, "idle");
+                stateTimer = 10;
+            } else {
+                stateTimer -= dt;
+                if (stateTimer <= 0) {
+                    bossState = 'idle';
+                    stateTimer = 1.5;
+                    hasPlayedIdleAnim = false;
+                }
+            }
+            break;
+
+        case 'idle':
+            if (!hasPlayedIdleAnim) {
+                playBossAnimation('idle', false, "idle");
+                hasPlayedIdleAnim = true;
+                stateTimer = 1.5;
+                break;
+            }
+
+            if (stateTimer > 0) {
+                stateTimer -= dt;
+                break;
+            }
+
+            if (dist < 2000) {
+                if (dist < 5000) bossState = 'attack1';
+                else if (dist > 10000) bossState = 'attack2';
+                else if (dist > 150000) bossState = 'attack3';
+                else bossState = 'attack5';
+
+                stateTimer = 0;
+                countshot = 0;
+                hasPlayedIdleAnim = false;
+                hasPlayedAttack1Anim = false;
+                hasPlayedTeleportAnim = false;
+                if (bossState === 'attack1') stateTimer = 1.15;
+                if (bossState === 'attack4') stateTimer = 3;
+            }
+            break;
+
+        case 'attack1':
+            //console.log(countshot)
+            //console.log(stateTimer)
+            if (!hasPlayedAttack1Anim) {
+                console.log("Playing attack1 anim");
+                playBossAnimation('attack1', false);
+                hasPlayedAttack1Anim = true;
+                stateTimer = 1.15;
+                return;
+            }
+
+            if (stateTimer > 0) {
+                stateTimer -= dt;
+                break;
+            }
+
+            countshot += 1;
+
+            if (countshot % 2000 === 0) {
+                createFlameAttack(boss.position);
+            }
+
+            
+
+            if (countshot > 106) {
+                bossState = 'teleport';
+                stateTimer = 3; // TP animation duration
+                hasPlayedTeleportAnim = false;
+                countshot = 0;
+            }
+            break;
+
+        case 'teleport':
+            if (!hasPlayedTeleportAnim) {
+                teleportLight.visible = true;
+                playBossAnimation('idle2', false); // play teleport-idle animation
+                hasPlayedTeleportAnim = true;
+                stateTimer = 0.9; // 27 frames at 30 FPS
+                break;
+            }
+
+            if (stateTimer > 0) {
+                stateTimer -= dt;
+                break;
+            }
+
+            teleportLight.visible = false;
+            bossState = 'idle';
+            stateTimer = 1.5;
+            hasPlayedIdleAnim = false;
+            break;
+        }
+
+    bossMixer && bossMixer.update(dt);
+}
+
+
+
+
+
+
+
+// Atualizar o mixer das animações e fazer a coordenção entre os movimentos do jogador e as animações para ser consistente não obstante os fps
+tickFunctions.push((delta) => {
+    // só começar animação quando o jogador chegar a uma certa distância
+    if (bossMixer && cutscene) {
+        bossMixer.update(delta);
+    }
+
+    //verificar se uma animação terminou
+    Object.values(bossAnimations).forEach(action => {
+        
+        if (!action.isRunning() && action.onFinish) {           
+            action.onFinish();
+            action.onFinish = null;
+        }
+    });
+
+});
+        
+
+
+
+
+
+
+
+//Criacao de alguns elementos para a cena não criados no blender 
+    const textureLoader = new TextureLoader();
+        const stoneTexture = textureLoader.load('stonetex.jpg', function(texture) {
+        texture.wrapS = THREE.RepeatWrapping;
+        texture.wrapT = THREE.RepeatWrapping;
+        texture.repeat.set(2, 4); // Adjust these values as needed
+    });
+
+            //colunas pequenas
+            function createColumn(x, z) {
+                const columnGeometry = new THREE.CylinderGeometry(1, 1, 10, 32);
+                const columnMaterial = new THREE.MeshStandardMaterial({ map: stoneTexture, roughness:0.8,color: 0x222222, });
+                const column = new THREE.Mesh(columnGeometry, columnMaterial);
+                column.position.set(x, 5, z);
+                column.scale.set(1,1,1)
+                createFlameLight(column.position.x, column.position.y + 5, column.position.z);
+                scene.add(column);
+            }
+            //colunas grandes 
+            function createColumn2(x, z) {
+                const columnGeometry = new THREE.CylinderGeometry(1, 1, 10, 32);
+                const columnMaterial = new THREE.MeshStandardMaterial({ map: stoneTexture, roughness:0.8,color: 0x222222, });
+                const column = new THREE.Mesh(columnGeometry, columnMaterial);
+                column.position.set(x, 5, z);
+                column.scale.set(3,5,3)
+                scene.add(column);
+            }
+            let flames = [];  //array para as chamas dos pilares
+
+
+
+
+
+
+
+// luz para as chamas dos postes
+function createFlameLight(x, y, z) {
+    const flameLight = new THREE.PointLight(0x66aa66, 4, 10);
+    flameLight.position.set(x, y + 2, z - 1);
+    scene.add(flameLight);
+
+
+    let modelo = null;
+    const loader5 = new GLTFLoader();
+    loader5.load('escada.glb', function (gltf) {
+    const modelo = gltf.scene;
+    modelo.position.set(150, 0, -10);   // posição do modelo
+    modelo.scale.set(2, 2, 2);        // escala do modelo
+    modelo.rotation.y = 0;  // rotação (opcional)
+
+    scene.add(modelo);                // adiciona o modelo à cena
+}, undefined, function (error) {
+    console.error('Erro ao carregar o modelo:', error);
+});
+
+
+// importar o modelo das chamas e a animação
+    const loader = new GLTFLoader();
+    let flameModel = null;
+    loader.load('flame.glb', function (gltf) {
+        const flame = gltf.scene;
+        flame.position.set(x, y + 2, z);
+        flame.scale.set(4, 4, 2);
+        scene.add(flame);
+        // ajustar carateristicas para ter aparncia de chama
+        flame.traverse(function (child) {
+            if (child.isMesh) {
+                child.castShadow = false;
+                child.receiveShadow = false;
+                child.material.emissive = new THREE.Color(0x7777bb); 
+                child.material.emissiveIntensity = 2; 
+            }
+        });
+
+        // animação movimento de chama 
+        const mixer = new THREE.AnimationMixer(flame);
+        gltf.animations.forEach((clip) => {
+            const startDelay = Math.random() * 5; // delay para evitar que as chamas estejam coordenadas
+            const action = mixer.clipAction(clip);
+            action.startAt(startDelay);
+            action.play();
+        });
+
+        // Guardar as chamas no array isto é uusado para a sua remoção posterior
+        flames.push({ flame, flameLight, position: new THREE.Vector3(x, y, z), mixer });
+
+        //atualizar a animação
+        function animateFlame() {
+            requestAnimationFrame(animateFlame);
+            mixer.update(0.016); // 60 fps
+        }
+        animateFlame(); 
+
+
+
+
+
+
+
+
+//parametros para o movimento das chamas
+let lightMovementSpeed = 0.001; // velocidade
+let maxLightOffset = 0.5; // Max offset
+
+
+// função utilizada para a alteração das light sources de forma a se comportarem como chamas.
+function moveLight() {
+    // alterações aleatorias na posição
+    const randomX = (Math.random() - 0.5) * maxLightOffset; 
+    const randomY = (Math.random() - 0.5) * maxLightOffset; 
+    const randomZ = (Math.random() - 0.5) * maxLightOffset; 
+
+    flameLight.position.set(
+        flame.position.x + randomX,  
+        flame.position.y + 2 + randomY, 
+        flame.position.z - 1 + randomZ  
+    );
+}
+
+        // atualizar a posição da luz
+        function animateLight() {
+            requestAnimationFrame(animateLight);
+            moveLight();
+        }
+        animateLight();
+    },);
+}
+
+            
+    // adicionar colunas á cena      
+        createColumn(10, -3);
+        createColumn(30, -3);
+        createColumn(50, -3);
+        createColumn(70, -3);
+        createColumn2(20, -2);
+        createColumn2(40, -2);
+        createColumn2(60, -2);
+        createColumn2(80, -2);
+
+
+    // gometria do jogador (todo a substituir por um modelo)
+    const playerGeometry = new THREE.BoxGeometry(1, 1, 1);
+    const playerMaterial = new THREE.MeshBasicMaterial({ color: 0x0000ff });
+    const player = new THREE.Mesh(playerGeometry, playerMaterial);
+    player.position.set(100, 1, -10);
+    //player.position.set(-20, 1, -10);
+    scene.add(player);
+    setInterval(() => {
+    console.log(`Player position: x=${player.position.x.toFixed(2)}, y=${player.position.y.toFixed(2)}, z=${player.position.z.toFixed(2)}`);
+}, 1000);
+
+    
+    camera.position.set(0, 2, 20);
+    //importar a parede de fundo
+    const loader = new GLTFLoader();
+    loader.load('bancada.gltf', function (gltf) {
+    const model = gltf.scene;
+    model.rotation.y=0;
+    model.rotation.x=-0.0
+    model.rotation.z=3.14
+    model.scale.set(1, 1, 1);
+    model.position.x=-40;
+    model.position.z=0;
+    model.position.y=30;
+    //model.rotation(90)
+    scene.add(model);
+});
+
+
+
+
+
+    //Lógica de movimentoi
+    const keys = {};
+    window.addEventListener('keydown', (event) => { keys[event.code] = true; });
+    window.addEventListener('keyup', (event) => { keys[event.code] = false; });
+    // listener para o clique do rato (ataque)
+    document.addEventListener("mousedown", (event) => {
+    if (event.button === 0) { 
+        console.log("fire")
+        playerAttack();
+    }
+});
+
+    //Adaptação a resize da janela
+    window.addEventListener('resize', () => {
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+    });
+
+
+
+
+
+    // parametros para a camera seguir o jogador
+    const cameraDistance = 15;
+    const cameraHeight = 5;
+    const cameraSmoothness = 1;
+    
+
+    // parametros para a logica de salto
+    const jumpHeight = 25;
+    var gravity = -500;
+    let velocityY = 0;
+    let isJumping = false;
+    let peakReached = false;
+    let boundaryp=1000;
+    let boundaryn=-38;
+    
+
+
+
+
+
+// spotlights para boss e jogador
+    const followLight = new THREE.PointLight(0xffffff, 10, 10);
+    followLight.position.set(player.position.x, player.position.y, player.position.z);
+    scene.add(followLight);
+
+    const bossSpotlight = new THREE.SpotLight(0x330000, 10);
+    bossSpotlight.position.set(0, 15, 0);
+    bossSpotlight.target.position.set(0, 5, 0);
+    bossSpotlight.angle = Math.PI / 4;
+    bossSpotlight.penumbra = 0.5;
+    bossSpotlight.castShadow = true;
+    bossSpotlight.visible = false; // Initially hidden
+    scene.add(bossSpotlight);
+    scene.add(bossSpotlight.target);
+
+
+
+
+    // parametros para a logica de dash
+    let dashSpeed = 1;
+    let dashDuration = 100;
+    let lastDirection = 1; // 1 direita, -1 esquerda
+    let canDash = true;
+    let isDashing=false;
+    var lastdashtime=0;
+    var dashCooldown=1500;
+    let Fall = false;
+    let lowheight= false;
+
+    //parametros logica para cooldowns e outros controlos
+    let count=0
+    let lastTime = Date.now();
+    let canDamage = true
+
+
+
+
+
+    function animate() {   
+        // verificar se o jogo acabou
+    if (playerHp <= 0) {
+            gameOver();
+        }
+    //console.log(bossHp)
+    if (bossHp <= 0) {
+        defeatBoss();
+    }
+    const delta = clock.getDelta(); 
+    requestAnimationFrame(animate);
+    //iniciar cutscene do boss
+    if (cutscene) {
+    updateBossState(delta);
+    bossSpotlight.visible = true;
+    bossSpotlight.position.set(boss.position.x, boss.position.y + 10, boss.position.z + 5);
+    bossSpotlight.target.position.set(boss.position.x, boss.position.y, boss.position.z);
+    }
+
+    
+    
+
+        // update boss logic directly (no tickFunctions)
+    
+    
+    tickFunctions.forEach(fn => fn(delta));
+    //console.log(startfight);
+    if (player.position.x<-5 && !cuttrig){
+        followLight.intensity=4;
+        followLight.distance=4;
+    
+    }
+
+    if ((player.position.x<303 && player.position.x>292)||(player.position.x<272 && player.position.x>249)){
+        Fall=true;
+    }
+    else{
+        Fall=false;
+    }
+    if (player.position.y<0){
+        lowheight=true;
+    }
+    else{
+        lowheight=false;
+}
+
+    if (player.position.x<-14 && !cuttrig){
+        cutscene=true
+        cuttrig=true;
+        followLight.intensity=10;
+        followLight.distance=10;
+        canMove = false;
+        setTimeout(() => {
+            startfight = true
+            canMove = true;
+            }, 2000);
+    }
+    // remover as chamas do array e as luzes
+    flames.forEach((flameObject, index) => {
+        if (player.position.x < 10) {
+            scene.remove(flameObject.flame);  
+            scene.remove(flameObject.flameLight);
+            
+            flames.splice(index, 1);  
+            
+
+            setTimeout(() => {
+            
+            }, 2000);
+        }
+    });
+
+    //console.log("Time since last dash:", Date.now() - lastdashtime);
+    //console.log("Can dash:", Date.now() - lastdashtime >= dashCooldown);
+
+    //tempos para controlo de cooldowns
+    
+    
+    let now = Date.now();
+    let deltaTime = (now - lastTime) / 1000;
+    lastTime = now;
+    // todos os movimentos sao regulados pelo delta time para consistencia com as animacoes independetemente de fps
+    if (!isDashing & canMove) {
+        if (lowheight==true){
+            boundaryn=293;
+            boundaryp=303;
+        }
+        else{
+            boundaryp=1000;
+            boundaryn=-1000;
+        }
+        
+        if (keys["KeyD"] && player.position.x > boundaryn) {
+            player.position.x -= 20 * deltaTime;
+            lastDirection = -1;
+        }
+
+        
+        if (keys["KeyA"] && player.position.x < boundaryp) {
+            player.position.x += 20 * deltaTime; 
+            lastDirection = 1;
+        }
+
+        // lógica para o dash cumprindo os cooldowns 
+        if (keys["ShiftLeft"] && Date.now() - lastdashtime >= dashCooldown) {
+            isDashing = true;
+            lastdashtime = Date.now();
+
+            let dashStartTime = Date.now();
+            function dashMove() {
+                let elapsed = Date.now() - dashStartTime;
+                if (elapsed < dashDuration && player.position.x>-38) {
+                    player.position.x += lastDirection * 100 * deltaTime; // movimento ajustado com delta time
+                    requestAnimationFrame(dashMove);
+                } else {
+                    isDashing = false;
+                }
+            }
+            dashMove();
+        }
+    }
+
+    // logica salto
+    if (keys["Space"] && !isJumping) {
+        velocityY = jumpHeight;
+        isJumping = true;
+        peakReached = false;
+    }
+    
+
+    // Aplicar gravidade aos saltos
+    if (isJumping || Fall) {
+        player.position.y += velocityY * deltaTime; 
+        velocityY += gravity * deltaTime; 
+
+        // alterar o valor da gravidade para tornar a animação mais fluida
+        if (velocityY < 0 && !peakReached) {
+            peakReached = true;
+            gravity = gravity / 2;
+        }
+        if (player.position.y <= -3 && Fall==true) {
+            player.position.y = -3;
+            isJumping = false;
+            velocityY = 0;
+            gravity = -60;
+            playerHp-=1000
+        }
+
+        // verificar se o jogador já aterrou
+        if (player.position.y <= 1 && Fall==false) {
+            player.position.y = 1;
+            isJumping = false;
+            velocityY = 0;
+            gravity = -60;
+        }
+        if(player.position.y<=-3)
+        playerHp-=1000;
+    }
+
+
+
+    
+    const time = Date.now() * 0.001;
+    count = count+1;
+    
+    // geração de ataques de chama (a ser mudado)
+    //if (count%200==0 && startfight) {
+        //createFlameAttack(boss.position);
+    //}
+
+
+
+
+
+
+    // logica para camara seguir o jogador e do spotlight
+    const targetPosition = new THREE.Vector3(player.position.x, cameraHeight + ((player.position.y / 2) - 1), player.position.z - cameraDistance);
+    camera.position.lerp(targetPosition, cameraSmoothness);
+    camera.lookAt(player.position);
+    followLight.position.set(player.position.x, player.position.y, player.position.z);
+
+    renderer.render(scene, camera);
+}
+
+
+//funcoes para quando se ganha ou se perde
+function gameOver() {
+    alert("Game Over");
+    location.reload(); // Reload the game
+}
+function defeatBoss() {
+    alert("Victory");
+    location.reload(); // Reload the game
+}
+
+
+
+
+
+
+const arenaLight = new THREE.PointLight(0x2f0f0f, 0, 1000);
+arenaLight.position.set(0, 20, -5);
+scene.add(arenaLight);
+
+
+
+function playerAttack() {
+    //console.log("ataque");
+    canDamage = true;
+
+    setTimeout(() => {
+        
+        checkBossHit();
+    }, 200); 
+    updateBossHpDisplay();
+}
+
+
+
+
+// ataques do boss apontados ao jogador e disparados com frequencia variavel
+function createFlameAttack(position) {
+    const flameGeometry = new THREE.SphereGeometry(0.5, 16, 16);
+    
+  
+    const flameMaterial = new THREE.MeshBasicMaterial({
+        color: 0x77bb77,        
+        emissive: 0x77bb77,      
+        emissiveIntensity: 1000, 
+        transparent: true,           
+    });
+    
+    const flame = new THREE.Mesh(flameGeometry, flameMaterial);
+    flame.position.copy(position);
+    scene.add(flame);
+
+    // mover para a posição atual do jogador
+    const targetPosition = player.position.clone();
+    const direction = targetPosition.sub(flame.position).normalize();//calculo do vetor de movimento para o ataque
+    const speed = 0.15;
+
+    function moveFlame() {
+    if (!flame.userData.hasHit) {
+        if (flame.position.distanceTo(player.position) < 0.5) { 
+            console.log("hit");
+            playerHp--;
+            updateHpDisplay();
+            flame.userData.hasHit = true;
+            setTimeout(() => scene.remove(flame), 0); 
+            return; 
+        }
+    }
+
+    flame.position.addScaledVector(direction, speed);
+
+    if (flame.position.distanceTo(position) > 20) {
+        scene.remove(flame);
+    }
+}
+
+function animateFlame() {
+    moveFlame();
+    requestAnimationFrame(animateFlame);
+}
+
+
+flame.userData.hasHit = false;
+    animateFlame();
+}
+
+
+
+
+
+//hitboxes baseadas em distancia poderá ser alterado se pretender que o as ataques sejam direcionais ou baseados num objeto (ex:espada)
+
+function checkBossHit() {
+    
+    if (canDamage) {
+        
+        const playerPosition = player.position;
+        const bossPosition = boss.position;
+        const distance = playerPosition.distanceTo(bossPosition); //distancia entre jogador e boss
+
+        
+        const attackRange = 5; // range ataque
+        if (distance <= attackRange) {
+            console.log("Boss hit!");
+            bossHp--; //atualizar vida do boss
+        }
+
+        // flag para evitar mais que 1 dano por ataque
+        canDamage = false;
+    }
+}
+
+    animate();
+}
+</script>
+
+</body>
+</html>
