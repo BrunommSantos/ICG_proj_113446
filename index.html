@@ -109,36 +109,36 @@
         let player;
         let playerMixer;
         const playerActions = {};
-
+        //funcao para a execução das animações do modelo do jogador
         function playPlayerAnimation(name, loop = false, nextAnimation = null) {
             //console.log(name)
-        const action = playerActions[name];
-        //console.log(action)
-        if (!action) return;
+            const action = playerActions[name];
+                //console.log(action)
+            if (!action) return;
 
-        
-        Object.values(playerActions).forEach(a => a.stop());
-
-        action
             
+            Object.values(playerActions).forEach(a => a.stop());
+
+            action
+                
             .setLoop(loop ? THREE.LoopRepeat : THREE.LoopOnce, loop ? Infinity : 1)
             .reset();
-        action.clampWhenFinished = !loop;
-        action.play();
+            action.clampWhenFinished = !loop;
+            action.play();
 
-        
-        if (!loop && nextAnimation) {
-            const onFinish = (event) => {
-            if (event.action === action) {
-                playPlayerAnimation(nextAnimation, false);
-                playerMixer.removeEventListener('finished', onFinish);
-            }
-            };
             
-            playerMixer.removeEventListener('finished', onFinish);
-            playerMixer.addEventListener('finished', onFinish);
-        }
-        }
+            if (!loop && nextAnimation) {
+                const onFinish = (event) => {
+                if (event.action === action) {
+                    playPlayerAnimation(nextAnimation, false);
+                    playerMixer.removeEventListener('finished', onFinish);
+                }
+                };
+                
+                playerMixer.removeEventListener('finished', onFinish);
+                playerMixer.addEventListener('finished', onFinish);
+            }
+            }
 
         startButton.addEventListener('click', () => {
             startButton.style.display = 'none';
@@ -146,7 +146,7 @@
         });
 
         diffButtons.forEach(btn => {
-    btn.addEventListener('click', () => {
+        btn.addEventListener('click', () => {
         difficultyMultiplier = parseFloat(btn.dataset.multiplier);
         document.getElementById('menu').style.display = 'none';
         document.getElementById('hpDisplay').style.display = 'block';
@@ -165,14 +165,15 @@
             });
             
             startGame(difficultyMultiplier);
+            });
         });
-    });
-})
+    })
+        // Iniciar o jogo
         function startGame(dif) {
             let playerHp = Math.floor(15 * dif);
             let bossHp = 30;
            
-
+            //atualização de displays de hp de jogador e boss
             function updateHpDisplay() {
                 const container = document.getElementById('hpHearts');
                 container.innerHTML = '';
@@ -180,12 +181,10 @@
                     container.innerHTML += '<span class="heart">♥</span>';
                 }
             }
-
-                    function updateBossDisplay() {
+            function updateBossDisplay() {
             
             const container = document.getElementById('bhpHearts');
             if (!container) {
-                console.error("updateBossDisplay(): couldn’t find #bhpHearts");
                 return;
             }
             container.innerHTML = '';
@@ -197,24 +196,19 @@
             
             updateHpDisplay();
             updateBossDisplay();
-    
+    //criação de cena e camera principal
     
     const scene = new THREE.Scene();
-    const teleportLight = new THREE.SpotLight(0xff0000, 10); 
-    teleportLight.position.set(-20, 8, -10);
-    teleportLight.angle = Math.PI / 6;
-    teleportLight.penumbra = 0.5;
-    teleportLight.decay = 2;
-    teleportLight.distance = 50;
-    teleportLight.visible = false;
+    const teleportLight = new THREE.SpotLight(0xff0000, 0); 
     scene.add(teleportLight);
     const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.set(0, 2, 20);
     const renderer = new THREE.WebGLRenderer();
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
 
     
-    // piso (a alterar)
+    // piso gerado em código ( a maior parte da cena é importada do blender)
     const groundGeometry = new THREE.PlaneGeometry(200, 50);
     const groundMaterial = new THREE.MeshLambertMaterial({ color: 0x0f0000 });
     const ground = new THREE.Mesh(groundGeometry, groundMaterial);
@@ -228,7 +222,7 @@
 
 
 
-    //load do modelo do boss configuração da sua posição e inicio de logica para as animações
+    //declacao de variaveis necessárias para lógica de jogo
     const loader3 = new GLTFLoader();
     let boss, bossMixer;
     
@@ -278,18 +272,18 @@
     let maxX = 18;
     let maxFallingSpikes;
     let hasPlayedAttack3Anim = false;
-    const spikeDamageThreshold = 1.25; // Half-width margin for hitbox
-    let hasTakenSpikeDamage = false;  // Prevent repeated damage during a single attack
+    const spikeDamageThreshold = 1.25; 
+    let hasTakenSpikeDamage = false;  
     let hasPlayedIdleAnim = false;
     const clock = new THREE.Clock();    
     let bossAnimations = {};
     const loaderlava = new GLTFLoader();
     let mixer;
     
-
+    // adicionar jogador
     scene.add(player);
 
-    
+    //import de boss e suas animações
     loader3.load('introevoo3.glb', function (gltf) {
         boss = gltf.scene;
         boss.position.set(-20, 6, -10);
@@ -307,7 +301,7 @@
          
 })
 
-       
+//função para criação de geometria para um dos ataques do boss       
 function createSpike(position) {
     const geometry = new THREE.ConeGeometry(0.5, 1, 12); 
     geometry.translate(0, 0.5, 0); 
@@ -323,7 +317,7 @@ function createSpike(position) {
     scene.add(spike);
     return spike;
 }
-
+//função para criação de geometria para um dos ataques do boss
 function createFallingNeedle(position) {
     const geometry = new THREE.CylinderGeometry(0.1, 0.4, 6, 6); 
     const material = new THREE.MeshStandardMaterial({
@@ -374,7 +368,7 @@ function playBossAnimation(name, loop = false, nextAnimation = null) {
     }
 }
 
-
+//abordagem inicial baseada em distância mas descartada por não existir um número de ataques suficiente para um comportmaneto satisfatório desta forma temos comportamneto aleatorio baseado nas probabilidades dasdas a cada ataque
 function updateBossState(dt) {
     //console.log(bossState);
     //console.log(boss.position);
@@ -384,6 +378,7 @@ function updateBossState(dt) {
     const dist = boss.position.distanceTo(player.position);
     //console.log(player.position.x)
     switch (bossState) {
+        //estado inicial faz a primeira animação e transiciona para idle
         case "start":
             if (stateTimer <= 0) {
                 playBossAnimation('Armature.001Action', false);
@@ -397,7 +392,7 @@ function updateBossState(dt) {
                 }
             }
             break;
-
+            // idle é utilizada como ponto inicial de idle pode realizar qualquer ataque permitindo aleatoriedade
         case 'idle':
             if (!hasPlayedIdleAnim) {
                 playBossAnimation('idle', false, "idle");
@@ -412,6 +407,7 @@ function updateBossState(dt) {
             }
 
             if (dist < 2000) {
+            //probabilidade para cada ataque
             const attacks = ['attack1','attack1','attack2','attack2','attack3'];
             const randomIndex = Math.floor(Math.random() * attacks.length);
             bossState = attacks[randomIndex];
@@ -425,7 +421,7 @@ function updateBossState(dt) {
                 if (bossState === 'attack4') stateTimer = 3;
             }
             break;
-
+        // lógica primeiro ataque
         case 'attack1':
             //console.log(countshot)
             //console.log(stateTimer)
@@ -463,11 +459,12 @@ function updateBossState(dt) {
 
             if (countshot > 106) {
                 bossState = 'teleport';
-                stateTimer = 3; // TP animation duration
+                stateTimer = 3; 
                 hasPlayedTeleportAnim = false;
                 countshot = 0;
             }
             break;
+        // lógica segundo ataque (espinhos no chão com 3 fases warning attack retract)
        case 'attack2':
     if (!hasPlayedAttack2Anim) {
         //console.log("Playing attack2 anim");
@@ -562,6 +559,8 @@ function updateBossState(dt) {
         stateTimer -= dt;
     }
     break;
+
+     // lógica terceiro ataque 
     case 'attack3':
     if (!hasPlayedAttack3Anim) {
         //console.log("Playing attack3 anim");
@@ -659,7 +658,7 @@ function updateBossState(dt) {
         break;
     }
 
-    // Cleanup
+    // Cleanup de espinhos
     for (let spike of fallingSpikes) {
         scene.remove(spike);
         spike.geometry.dispose();
@@ -668,6 +667,8 @@ function updateBossState(dt) {
     fallingSpikes = [];
     fallingSpikeData = [];
 
+
+    // estado teleport utilizado para dar reset para idle após ataques
     bossState = 'teleport';
     hasPlayedAttack3Anim = false;
     hasPlayedTeleportAnim = false;
@@ -678,7 +679,7 @@ function updateBossState(dt) {
             
             if (!hasPlayedTeleportAnim) {
                 
-                spawnSimpleSmoke(boss.position);
+                redcircle(boss.position);
                 playBossAnimation('idle2', false); // play teleport-idle animation
                 hasPlayedTeleportAnim = true;
                 stateTimer = 0.9; 
@@ -706,7 +707,8 @@ const smokeMaterial = new THREE.SpriteMaterial({
     transparent: true,
     opacity: 0.6,
 });
-function spawnSimpleSmoke(position) {
+//esfera a aparecer quando volta para idle
+function redcircle(position) {
     const smokeMaterial = new THREE.MeshBasicMaterial({
         map: smokeTexture,
         transparent: true,
@@ -723,6 +725,7 @@ function spawnSimpleSmoke(position) {
     const fadeDuration = 1.5;
     let elapsed = 0;
 
+    //fadeout gradual da esfera
     function fadeOut(delta) {
         elapsed += delta;
         sphere.material.opacity = THREE.MathUtils.lerp(0.7, 0, elapsed / fadeDuration);
@@ -778,7 +781,7 @@ tickFunctions.push((delta) => {
         const stoneTexture = textureLoader.load('stonetex.jpg', function(texture) {
         texture.wrapS = THREE.RepeatWrapping;
         texture.wrapT = THREE.RepeatWrapping;
-        texture.repeat.set(2, 4); // Adjust these values as needed
+        texture.repeat.set(2, 4); 
     });
 
             //colunas pequenas
@@ -808,24 +811,24 @@ tickFunctions.push((delta) => {
 
 
 
-// luz para as chamas dos postes
+// luz para as chamas dos postes simular fogo
 function createFlameLight(x, y, z) {
     const flameLight = new THREE.PointLight(0xaa6600, 10, 50);
     flameLight.position.set(x, y + 2, z - 1);
     scene.add(flameLight);
 
-
+    //Modelo principal de cena
     let modelo = null;
     const loader5 = new GLTFLoader();
     loader5.load('escada.glb', function (gltf) {
     const modelo = gltf.scene;
-    modelo.position.set(150, 0, -10);   // posição do modelo
-    modelo.scale.set(2, 2, 2);        // escala do modelo
-    modelo.rotation.y = 0;  // rotação (opcional)
+    modelo.position.set(150, 0, -10);   
+    modelo.scale.set(2, 2, 2);       
+    modelo.rotation.y = 0;  
 
-    scene.add(modelo);                // adiciona o modelo à cena
+    scene.add(modelo);                
 }, undefined, function (error) {
-    console.error('Erro ao carregar o modelo:', error);
+    console.error('Erro ao carregar:', error);
 });
 
 
@@ -862,7 +865,7 @@ function createFlameLight(x, y, z) {
         //atualizar a animação
         function animateFlame() {
             requestAnimationFrame(animateFlame);
-            mixer.update(0.016); // 60 fps
+            mixer.update(0.016);
         }
         animateFlame(); 
 
@@ -875,10 +878,10 @@ function createFlameLight(x, y, z) {
 
 //parametros para o movimento das chamas
 let lightMovementSpeed = 0.001; // velocidade
-let maxLightOffset = 0.5; // Max offset
+let maxLightOffset = 0.5; // offset de movimento
 
 
-// Simple smoke spawn function
+
 
 
 // função utilizada para a alteração das light sources de forma a se comportarem como chamas.
@@ -915,7 +918,7 @@ function moveLight() {
     
 
     
-    camera.position.set(0, 2, 20);
+    
     
 
 
@@ -930,7 +933,7 @@ function moveLight() {
     let lastAttackTime = 0;
     const attackCooldown = 500; 
 
-// Listener
+// listener para input de ataque
 document.addEventListener("mousedown", (event) => {
     if (event.button === 0) {
         const now = performance.now();
@@ -1068,7 +1071,7 @@ document.addEventListener("mousedown", (event) => {
     bossSpotlight.position.set(boss.position.x, boss.position.y + 10, boss.position.z + 5);
     bossSpotlight.target.position.set(boss.position.x, boss.position.y, boss.position.z);
     }
-
+    // lógica para definição do estado do jogador e ter respetiva animação
     let nextState;
         if (lastDirection === -1) {
     player.rotation.y = 0;           
@@ -1118,7 +1121,7 @@ if (nextState !== playerState) {
     
     
     tickFunctions.forEach(fn => fn(delta));
-    
+    //definição de lógica adicional e simulação de fisica para queda nos espinhos do tutorial
     if (player.position.x<-5 && !cuttrig){
         followLight.intensity=4;
         followLight.distance=4;
@@ -1150,11 +1153,8 @@ if (nextState !== playerState) {
             canMove = true;
             }, 2000);
     }
-    // remover as chamas do array e as luzes
     
 
-    //console.log("Time since last dash:", Date.now() - lastdashtime);
-    //console.log("Can dash:", Date.now() - lastdashtime >= dashCooldown);
 
     //tempos para controlo de cooldowns
     
@@ -1250,11 +1250,7 @@ if (nextState !== playerState) {
     const time = Date.now() * 0.001;
     count = count+1;
     
-    // geração de ataques de chama (a ser mudado)
-    //if (count%200==0 && startfight) {
-        //createFlameAttack(boss.position);
-    //}
-
+    
 
 
 
@@ -1274,11 +1270,11 @@ if (nextState !== playerState) {
 //funcoes para quando se ganha ou se perde
 function gameOver() {
     alert("Game Over");
-    location.reload(); // Reload the game
+    location.reload(); // reload jogo
 }
 function defeatBoss() {
     alert("Victory");
-    location.reload(); // Reload the game
+    location.reload(); // reload jogo
 }
 
 
@@ -1358,10 +1354,12 @@ function animateFlame() {
 flame.userData.hasHit = false;
     animateFlame();
 }
+
+//criação de ataques em chama em arco
 function createFlameAttack2(originPosition) {
     const flameGeometry = new THREE.SphereGeometry(0.5, 16, 16);
     const baseColor = 0xbb1111;
-
+    //obter direção horizontal relatiamente ao jogador esquerda ou direita
     const baseDirection = player.position.clone().sub(originPosition).normalize();
 
     
@@ -1371,14 +1369,14 @@ function createFlameAttack2(originPosition) {
 
     const speed = 0.15;
 
-    
+    //angulos apra o arco
     const arcAngles = [-Math.PI / 6, -Math.PI / 12, Math.PI / 12, Math.PI / 6]; // semi-arch in Y
-
+    //para cada angulo gerar chamas
     for (let angle of arcAngles) {
         
         const direction = horizontalDirection.clone();
 
-        
+        //calcular a direção para cada chama com base no ângulo utilizando quaternions
         const axis = new THREE.Vector3().crossVectors(horizontalDirection, new THREE.Vector3(0, 1, 0)).normalize(); 
         const quaternion = new THREE.Quaternion().setFromAxisAngle(axis, angle);
         direction.applyQuaternion(quaternion).normalize();
@@ -1408,7 +1406,7 @@ function createFlameAttack2(originPosition) {
                     return;
                 }
             }
-
+            //adicionar vetor calculado para movimento chama
             flame.position.addScaledVector(direction, speed);
 
             if (flame.position.distanceTo(originPosition) > 20) {
