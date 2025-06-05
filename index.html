@@ -51,6 +51,23 @@
         button:hover {
             background: #555;
         }
+        #bossHpDisplay {
+            display: none;
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            font-size: 24px;
+            color: white;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            border-radius: 5px;
+            }
+
+            .black-heart {
+            color: whitesmoke;
+            font-size: 24px;
+            margin-right: 4px;
+            }
     </style>
 </head>
 <body>
@@ -69,6 +86,10 @@
 
     <div id="hpDisplay">
         <div id="hpHearts"></div>
+    </div>
+
+    <div id="bossHpDisplay">
+    <div id="bhpHearts"></div>
     </div>
 
     <script type="importmap">
@@ -150,6 +171,7 @@
         function startGame(dif) {
             let playerHp = Math.floor(15 * dif);
             let bossHp = 30;
+           
 
             function updateHpDisplay() {
                 const container = document.getElementById('hpHearts');
@@ -159,8 +181,22 @@
                 }
             }
 
+                    function updateBossDisplay() {
+            
+            const container = document.getElementById('bhpHearts');
+            if (!container) {
+                console.error("updateBossDisplay(): couldn’t find #bhpHearts");
+                return;
+            }
+            container.innerHTML = '';
+            for (let i = 0; i < bossHp; i++) {
+                container.innerHTML += '<span class="black-heart">♥</span>';
+            }
+        }
+
             
             updateHpDisplay();
+            updateBossDisplay();
     
     
     const scene = new THREE.Scene();
@@ -713,6 +749,7 @@ tickFunctions.push((delta) => {
     // só começar animação quando o jogador chegar a uma certa distância
     if (bossMixer && cutscene) {
         bossMixer.update(delta);
+        
     }
         if ( playerMixer ) {
     playerMixer.update( delta );
@@ -942,7 +979,7 @@ document.addEventListener("mousedown", (event) => {
     scene.add(followLight);
     
      
-    const Spot1 = new THREE.PointLight(0x000000, 10, 500);
+    const Spot1 = new THREE.PointLight(0x000000, 100, 5000);
     Spot1.position.set(240, 0, 50);
     Spot1.angle    = Math.PI / 6;
     Spot1.penumbra = 0.2;
@@ -1264,6 +1301,7 @@ function playerAttack() {
         
         checkBossHit();
     }, 330); 
+    
     //updateBossHpDisplay();
 }
 
@@ -1405,6 +1443,11 @@ function checkBossHit() {
         if (distance <= attackRange) {
             console.log("Boss hit!");
             bossHp--; //atualizar vida do boss
+            if (cutscene){
+                console.log(cutscene);
+                updateBossDisplay();
+                document.getElementById('bossHpDisplay').style.display = 'block';
+            }
             console.log(bossHp)
         }
 
